@@ -59,8 +59,6 @@
             </div>
         </div>
 
-        <button onclick="calculateSIP()">Calculate</button>
-
         <div id="results" class="results hidden">
             <div class="result-item">
                 <span class="result-label">Invested Amount</span>
@@ -95,10 +93,20 @@
 
         const currencySelect = document.getElementById('currency');
         const currencySymbolSpan = document.getElementById('currency-symbol');
+        const monthlyInvestmentInput = document.getElementById('monthly-investment');
+        const returnRateInput = document.getElementById('return-rate');
+        const timePeriodInput = document.getElementById('time-period');
 
+        // Update currency symbol and recalculate when currency changes
         currencySelect.addEventListener('change', function() {
             currencySymbolSpan.textContent = currencySymbols[this.value];
+            calculateSIP();
         });
+
+        // Auto-calculate when any input changes
+        monthlyInvestmentInput.addEventListener('input', calculateSIP);
+        returnRateInput.addEventListener('input', calculateSIP);
+        timePeriodInput.addEventListener('input', calculateSIP);
 
         function formatCurrency(amount, currency) {
             return new Intl.NumberFormat('en-US', {
