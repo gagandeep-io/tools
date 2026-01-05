@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lump Sum Calculator</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        canvas {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lump Sum Calculator</h1>
+        <p class="subtitle">Calculate your one-time investment returns with compound interest</p>
+
+        <div class="slider-group">
+            <label for="currency">Currency</label>
+            <select id="currency">
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="SEK" selected>SEK (kr)</option>
+                <option value="INR">INR (₹)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="AUD">AUD (A$)</option>
+                <option value="CAD">CAD (C$)</option>
+            </select>
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="initial-investment">Initial Investment</label>
+                <span class="slider-value" id="initial-value">kr 100,000</span>
+            </div>
+            <input type="range" id="initial-investment" min="10000" max="10000000" step="10000" value="100000">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="return-rate">Expected Return Rate (p.a.)</label>
+                <span class="slider-value" id="return-value">12%</span>
+            </div>
+            <input type="range" id="return-rate" min="1" max="30" step="0.5" value="12">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="time-period">Time Period</label>
+                <span class="slider-value" id="time-value">10 Yrs</span>
+            </div>
+            <input type="range" id="time-period" min="1" max="40" step="1" value="10">
+        </div>
+
+        <div id="results" class="results">
+            <div class="result-item">
+                <span class="result-label">Invested Amount</span>
+                <span class="result-value" id="invested-amount">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Estimated Returns</span>
+                <span class="result-value" id="est-returns">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Total Value</span>
+                <span class="result-value highlight" id="total-value">-</span>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="growth-chart" width="520" height="280"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currencySymbols = {
+            'USD': '$',
+            'EUR': '€',
+            'GBP': '£',
+            'SEK': 'kr',
+            'INR': '₹',
+            'JPY': '¥',
+            'AUD': 'A$',
+            'CAD': 'C$'
+        };
+
+        // DOM elements
+        const currencySelect = document.getElementById('currency');
+        const initialSlider = document.getElementById('initial-investment');
+        const returnSlider = document.getElementById('return-rate');
+        const timeSlider = document.getElementById('time-period');
+        const initialValueDisplay = document.getElementById('initial-value');
+        const returnValueDisplay = document.getElementById('return-value');
+        const timeValueDisplay = document.getElementById('time-value');
+
+        function formatCurrency(amount, currency) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatSliderCurrency(amount) {
+            const currency = currencySelect.value;
+            const symbol = currencySymbols[currency];
+            return symbol + ' ' + amount.toLocaleString();
+        }
+
+        function updateSliderDisplays() {
+            initialValueDisplay.textContent = formatSliderCurrency(parseFloat(initialSlider.value));
+            returnValueDisplay.textContent = returnSlider.value + '%';
+            timeValueDisplay.textContent = timeSlider.value + ' Yrs';
+        }
+
+        function calculateLumpSum() {
+            const initialInvestment = parseFloat(initialSlider.value);
+            const annualRate = parseFloat(returnSlider.value) / 100;
+            const years = parseFloat(timeSlider.value);
+            const currency = currencySelect.value;
+
+            // Compound Interest Formula: A = P(1 + r)^t
+            const futureValue = initialInvestment * Math.pow(1 + annualRate, years);
+            const estimatedReturns = futureValue - initialInvestment;
+
+            // Display results
+            document.getElementById('invested-amount').textContent = formatCurrency(initialInvestment, currency);
+            document.getElementById('est-returns').textContent = formatCurrency(estimatedReturns, currency);
+            document.getElementById('total-value').textContent = formatCurrency(futureValue, currency);
+
+            // Draw growth chart
+            drawGrowthChart(initialInvestment, annualRate, years);
+        }
+
+        function drawGrowthChart(initialInvestment, annualRate, totalYears) {
+            const canvas = document.getElementById('growth-chart');
+            const ctx = canvas.getContext('2d');
+
+            // Chart dimensions
+            const padding = { left: 50, right: 20, top: 20, bottom: 40 };
+            const chartWidth = canvas.width - padding.left - padding.right;
+            const chartHeight = canvas.height - padding.top - padding.bottom;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate data points for each year
+            const dataPoints = [];
+            const pointsPerYear = totalYears <= 10 ? 4 : totalYears <= 20 ? 2 : 1;
+            const totalPoints = totalYears * pointsPerYear;
+
+            for (let i = 0; i <= totalPoints; i++) {
+                const year = i / pointsPerYear;
+                const invested = initialInvestment;
+                const totalValue = initialInvestment * Math.pow(1 + annualRate, year);
+
+                dataPoints.push({ year, invested, totalValue });
+            }
+
+            // Find max value for scaling
+            const maxValue = Math.max(...dataPoints.map(d => d.totalValue));
+
+            // Helper function to convert data to canvas coordinates
+            function toX(year) {
+                return padding.left + (year / totalYears) * chartWidth;
+            }
+
+            function toY(value) {
+                return padding.top + chartHeight - (value / maxValue) * chartHeight;
+            }
+
+            // Draw grid lines
+            ctx.strokeStyle = 'rgb(229, 231, 235)';
+            ctx.lineWidth = 1;
+            const gridLines = 4;
+            for (let i = 0; i <= gridLines; i++) {
+                const y = padding.top + (chartHeight / gridLines) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartWidth, y);
+                ctx.stroke();
+            }
+
+            // Draw invested amount area (flat line)
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.1)';
+            ctx.fillRect(
+                padding.left,
+                toY(initialInvestment),
+                chartWidth,
+                chartHeight + padding.top - toY(initialInvestment)
+            );
+
+            // Draw invested amount line
+            ctx.strokeStyle = 'rgb(14, 165, 233)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, toY(initialInvestment));
+            ctx.lineTo(padding.left + chartWidth, toY(initialInvestment));
+            ctx.stroke();
+
+            // Draw total value area
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+            ctx.beginPath();
+            ctx.moveTo(padding.left, toY(initialInvestment));
+            dataPoints.forEach(d => {
+                ctx.lineTo(toX(d.year), toY(d.totalValue));
+            });
+            ctx.lineTo(padding.left + chartWidth, toY(initialInvestment));
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw total value line
+            ctx.strokeStyle = 'rgb(34, 197, 94)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dataPoints.forEach((d, i) => {
+                if (i === 0) {
+                    ctx.moveTo(toX(d.year), toY(d.totalValue));
+                } else {
+                    ctx.lineTo(toX(d.year), toY(d.totalValue));
+                }
+            });
+            ctx.stroke();
+
+            // Draw axes
+            ctx.strokeStyle = 'rgb(107, 114, 128)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+            ctx.stroke();
+
+            // Draw Y-axis labels
+            ctx.fillStyle = 'rgb(107, 114, 128)';
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= gridLines; i++) {
+                const value = maxValue * (1 - i / gridLines);
+                const y = padding.top + (chartHeight / gridLines) * i;
+                const label = value >= 1000000 ? (value / 1000000).toFixed(1) + 'M' :
+                             value >= 1000 ? (value / 1000).toFixed(0) + 'K' :
+                             value.toFixed(0);
+                ctx.fillText(label, padding.left - 5, y);
+            }
+
+            // Draw X-axis labels (years)
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const yearSteps = totalYears <= 10 ? 1 : totalYears <= 20 ? 2 : 5;
+            for (let year = 0; year <= totalYears; year += yearSteps) {
+                const x = toX(year);
+                ctx.fillText(year + 'y', x, padding.top + chartHeight + 5);
+            }
+
+            // Draw legend
+            ctx.textAlign = 'left';
+            ctx.font = '12px system-ui';
+
+            // Invested legend
+            ctx.fillStyle = 'rgb(14, 165, 233)';
+            ctx.fillRect(padding.left + chartWidth - 110, padding.top + 5, 15, 3);
+            ctx.fillStyle = 'rgb(75, 85, 99)';
+            ctx.fillText('Invested', padding.left + chartWidth - 90, padding.top + 5);
+
+            // Total value legend
+            ctx.fillStyle = 'rgb(34, 197, 94)';
+            ctx.fillRect(padding.left + chartWidth - 110, padding.top + 20, 15, 3);
+            ctx.fillStyle = 'rgb(75, 85, 99)';
+            ctx.fillText('Total', padding.left + chartWidth - 90, padding.top + 20);
+        }
+
+        // Event listeners for sliders
+        initialSlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateLumpSum();
+        });
+
+        returnSlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateLumpSum();
+        });
+
+        timeSlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateLumpSum();
+        });
+
+        // Currency change updates displays and recalculates
+        currencySelect.addEventListener('change', function() {
+            updateSliderDisplays();
+            calculateLumpSum();
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', function() {
+            updateSliderDisplays();
+            calculateLumpSum();
+        });
+    </script>
+</body>
+</html>
