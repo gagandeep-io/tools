@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a collection of random tools and utilities for daily use. Currently minimal, containing only a simple HTML page.
 
+## Coding guidelines
+ - The code that you write in this repository should be simple. HTML, JavaScript and CSS. No fancy framework. No React.
+
 ## Architecture
 
 This repository is a flat structure with standalone tools and utilities. Each tool is self-contained with no dependencies between them.

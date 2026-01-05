@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIP Calculator</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        .currency-select {
+            margin-bottom: 24px;
+        }
+
+        canvas {
+            max-width: 300px;
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SIP Calculator</h1>
+        <p class="subtitle">Calculate your investment returns with Systematic Investment Plan</p>
+
+        <div class="currency-select">
+            <label for="currency">Currency</label>
+            <select id="currency">
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="SEK" selected>SEK (kr)</option>
+                <option value="INR">INR (₹)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="AUD">AUD (A$)</option>
+                <option value="CAD">CAD (C$)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="monthly-investment">Monthly Investment</label>
+            <div class="input-wrapper">
+                <span class="input-prefix" id="currency-symbol">kr</span>
+                <input type="number" id="monthly-investment" class="with-prefix" value="5000" min="500" step="100">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="return-rate">Expected Return Rate (p.a.)</label>
+            <div class="input-wrapper">
+                <input type="number" id="return-rate" class="with-suffix" value="12" min="1" max="30" step="0.1">
+                <span class="input-suffix">%</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="time-period">Time Period</label>
+            <div class="input-wrapper">
+                <input type="number" id="time-period" class="with-suffix" value="10" min="1" max="40" step="1">
+                <span class="input-suffix">Years</span>
+            </div>
+        </div>
+
+        <button onclick="calculateSIP()">Calculate</button>
+
+        <div id="results" class="results hidden">
+            <div class="result-item">
+                <span class="result-label">Invested Amount</span>
+                <span class="result-value" id="invested-amount">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Estimated Returns</span>
+                <span class="result-value" id="est-returns">-</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Total Value</span>
+                <span class="result-value highlight" id="total-value">-</span>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="pie-chart" width="300" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currencySymbols = {
+            'USD': '$',
+            'EUR': '€',
+            'GBP': '£',
+            'SEK': 'kr',
+            'INR': '₹',
+            'JPY': '¥',
+            'AUD': 'A$',
+            'CAD': 'C$'
+        };
+
+        const currencySelect = document.getElementById('currency');
+        const currencySymbolSpan = document.getElementById('currency-symbol');
+
+        currencySelect.addEventListener('change', function() {
+            currencySymbolSpan.textContent = currencySymbols[this.value];
+        });
+
+        function formatCurrency(amount, currency) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function calculateSIP() {
+            const monthlyInvestment = parseFloat(document.getElementById('monthly-investment').value);
+            const annualRate = parseFloat(document.getElementById('return-rate').value);
+            const years = parseFloat(document.getElementById('time-period').value);
+            const currency = document.getElementById('currency').value;
+
+            if (!monthlyInvestment || !annualRate || !years) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            if (monthlyInvestment < 500) {
+                alert('Minimum monthly investment should be 500');
+                return;
+            }
+
+            // Convert annual rate to monthly rate using compound interest formula
+            // Monthly Return = {(1 + Annual Return)^1/12} – 1
+            const annualRateDecimal = annualRate / 100;
+            const monthlyRate = Math.pow(1 + annualRateDecimal, 1/12) - 1;
+
+            // Total number of months
+            const months = years * 12;
+
+            // SIP Formula: M = P × ([1 + i]^n – 1) / i) × (1 + i)
+            const futureValue = monthlyInvestment *
+                (Math.pow(1 + monthlyRate, months) - 1) / monthlyRate *
+                (1 + monthlyRate);
+
+            const investedAmount = monthlyInvestment * months;
+            const estimatedReturns = futureValue - investedAmount;
+
+            // Display results
+            document.getElementById('invested-amount').textContent = formatCurrency(investedAmount, currency);
+            document.getElementById('est-returns').textContent = formatCurrency(estimatedReturns, currency);
+            document.getElementById('total-value').textContent = formatCurrency(futureValue, currency);
+            document.getElementById('results').classList.remove('hidden');
+
+            // Draw pie chart
+            drawPieChart(investedAmount, estimatedReturns);
+        }
+
+        function drawPieChart(invested, returns) {
+            const canvas = document.getElementById('pie-chart');
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 120;
+
+            const total = invested + returns;
+            const investedAngle = (invested / total) * 2 * Math.PI;
+            const returnsAngle = (returns / total) * 2 * Math.PI;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw invested amount slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, investedAngle);
+            ctx.closePath();
+            ctx.fillStyle = 'rgb(14, 165, 233)';
+            ctx.fill();
+
+            // Draw returns slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, investedAngle, investedAngle + returnsAngle);
+            ctx.closePath();
+            ctx.fillStyle = 'rgb(34, 197, 94)';
+            ctx.fill();
+
+            // Add labels
+            ctx.fillStyle = 'rgb(17, 24, 39)';
+            ctx.font = 'bold 14px system-ui';
+            ctx.textAlign = 'center';
+
+            // Invested label
+            const investedLabelAngle = investedAngle / 2;
+            const investedLabelX = centerX + Math.cos(investedLabelAngle) * (radius / 1.5);
+            const investedLabelY = centerY + Math.sin(investedLabelAngle) * (radius / 1.5);
+            ctx.fillText('Invested', investedLabelX, investedLabelY);
+
+            // Returns label
+            const returnsLabelAngle = investedAngle + returnsAngle / 2;
+            const returnsLabelX = centerX + Math.cos(returnsLabelAngle) * (radius / 1.5);
+            const returnsLabelY = centerY + Math.sin(returnsLabelAngle) * (radius / 1.5);
+            ctx.fillText('Returns', returnsLabelX, returnsLabelY);
+        }
+
+        // Calculate on page load with default values
+        window.addEventListener('load', function() {
+            calculateSIP();
+        });
+    </script>
+</body>
+</html>

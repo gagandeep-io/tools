@@ -3,20 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>Tools</title>
+    <link rel="stylesheet" href="common.css">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: system-ui, -apple-system, sans-serif;
+        .tools-list {
+            list-style: none;
+        }
+
+        .tools-list li {
+            margin-bottom: 12px;
+        }
+
+        .tools-list a {
+            display: block;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .tools-list a:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
         }
     </style>
 </head>
 <body>
-    <h1>Hello World</h1>
+    <div class="container">
+        <h1>Tools Collection</h1>
+        <p class="subtitle">Simple utilities for daily use</p>
+
+        <ul class="tools-list">
+            <li><a href="sip-calculator.html">SIP Calculator</a></li>
+        </ul>
+    </div>
 </body>
 </html>
