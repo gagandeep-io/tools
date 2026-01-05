@@ -6,10 +6,6 @@
     <title>SIP Calculator</title>
     <link rel="stylesheet" href="common.css">
     <style>
-        .currency-select {
-            margin-bottom: 24px;
-        }
-
         canvas {
             max-width: 300px;
             max-height: 300px;
@@ -21,7 +17,7 @@
         <h1>SIP Calculator</h1>
         <p class="subtitle">Calculate your investment returns with Systematic Investment Plan</p>
 
-        <div class="currency-select">
+        <div class="slider-group">
             <label for="currency">Currency</label>
             <select id="currency">
                 <option value="USD">USD ($)</option>
@@ -35,33 +31,31 @@
             </select>
         </div>
 
-        <div class="input-group">
-            <label for="monthly-investment">Monthly Investment</label>
-            <div class="input-wrapper">
-                <span class="input-prefix" id="currency-symbol">kr</span>
-                <input type="number" id="monthly-investment" class="with-prefix" value="5000" min="500" step="100">
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="monthly-investment">Monthly Investment</label>
+                <span class="slider-value" id="monthly-value">kr 5,000</span>
             </div>
+            <input type="range" id="monthly-investment" min="500" max="100000" step="500" value="5000">
         </div>
 
-        <div class="input-group">
-            <label for="return-rate">Expected Return Rate (p.a.)</label>
-            <div class="input-wrapper">
-                <input type="number" id="return-rate" class="with-suffix" value="12" min="1" max="30" step="0.1">
-                <span class="input-suffix">%</span>
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="return-rate">Expected Return Rate (p.a.)</label>
+                <span class="slider-value" id="return-value">12%</span>
             </div>
+            <input type="range" id="return-rate" min="1" max="30" step="0.5" value="12">
         </div>
 
-        <div class="input-group">
-            <label for="time-period">Time Period</label>
-            <div class="input-wrapper">
-                <input type="number" id="time-period" class="with-suffix" value="10" min="1" max="40" step="1">
-                <span class="input-suffix">Years</span>
+        <div class="slider-group">
+            <div class="slider-header">
+                <label for="time-period">Time Period</label>
+                <span class="slider-value" id="time-value">10 Yrs</span>
             </div>
+            <input type="range" id="time-period" min="1" max="40" step="1" value="10">
         </div>
 
-        <button onclick="calculateSIP()">Calculate</button>
-
-        <div id="results" class="results hidden">
+        <div id="results" class="results">
             <div class="result-item">
                 <span class="result-label">Invested Amount</span>
                 <span class="result-value" id="invested-amount">-</span>
@@ -93,12 +87,14 @@
             'CAD': 'C$'
         };
 
+        // DOM elements
         const currencySelect = document.getElementById('currency');
-        const currencySymbolSpan = document.getElementById('currency-symbol');
-
-        currencySelect.addEventListener('change', function() {
-            currencySymbolSpan.textContent = currencySymbols[this.value];
-        });
+        const monthlySlider = document.getElementById('monthly-investment');
+        const returnSlider = document.getElementById('return-rate');
+        const timeSlider = document.getElementById('time-period');
+        const monthlyValueDisplay = document.getElementById('monthly-value');
+        const returnValueDisplay = document.getElementById('return-value');
+        const timeValueDisplay = document.getElementById('time-value');
 
         function formatCurrency(amount, currency) {
             return new Intl.NumberFormat('en-US', {
@@ -109,24 +105,25 @@
             }).format(amount);
         }
 
+        function formatSliderCurrency(amount) {
+            const currency = currencySelect.value;
+            const symbol = currencySymbols[currency];
+            return symbol + ' ' + amount.toLocaleString();
+        }
+
+        function updateSliderDisplays() {
+            monthlyValueDisplay.textContent = formatSliderCurrency(parseFloat(monthlySlider.value));
+            returnValueDisplay.textContent = returnSlider.value + '%';
+            timeValueDisplay.textContent = timeSlider.value + ' Yrs';
+        }
+
         function calculateSIP() {
-            const monthlyInvestment = parseFloat(document.getElementById('monthly-investment').value);
-            const annualRate = parseFloat(document.getElementById('return-rate').value);
-            const years = parseFloat(document.getElementById('time-period').value);
-            const currency = document.getElementById('currency').value;
-
-            if (!monthlyInvestment || !annualRate || !years) {
-                alert('Please fill in all fields');
-                return;
-            }
-
-            if (monthlyInvestment < 500) {
-                alert('Minimum monthly investment should be 500');
-                return;
-            }
+            const monthlyInvestment = parseFloat(monthlySlider.value);
+            const annualRate = parseFloat(returnSlider.value);
+            const years = parseFloat(timeSlider.value);
+            const currency = currencySelect.value;
 
             // Convert annual rate to monthly rate using compound interest formula
-            // Monthly Return = {(1 + Annual Return)^1/12} – 1
             const annualRateDecimal = annualRate / 100;
             const monthlyRate = Math.pow(1 + annualRateDecimal, 1/12) - 1;
 
@@ -145,7 +142,6 @@
             document.getElementById('invested-amount').textContent = formatCurrency(investedAmount, currency);
             document.getElementById('est-returns').textContent = formatCurrency(estimatedReturns, currency);
             document.getElementById('total-value').textContent = formatCurrency(futureValue, currency);
-            document.getElementById('results').classList.remove('hidden');
 
             // Draw pie chart
             drawPieChart(investedAmount, estimatedReturns);
@@ -199,8 +195,31 @@
             ctx.fillText('Returns', returnsLabelX, returnsLabelY);
         }
 
-        // Calculate on page load with default values
+        // Event listeners for sliders
+        monthlySlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateSIP();
+        });
+
+        returnSlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateSIP();
+        });
+
+        timeSlider.addEventListener('input', function() {
+            updateSliderDisplays();
+            calculateSIP();
+        });
+
+        // Currency change updates displays and recalculates
+        currencySelect.addEventListener('change', function() {
+            updateSliderDisplays();
+            calculateSIP();
+        });
+
+        // Initialize on page load
         window.addEventListener('load', function() {
+            updateSliderDisplays();
             calculateSIP();
         });
     </script>
