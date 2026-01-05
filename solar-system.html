@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System</title>
+    <!-- Use common styles for fonts, but we'll override most things for the full-screen experience -->
+    <link rel="stylesheet" href="common.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            /* Deep space black */
+            overflow: hidden;
+            /* No scrollbars */
+            color: white;
+            display: block;
+            /* Override flex from common.css */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #solar-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2;
+            pointer-events: none;
+            /* Let clicks pass through */
+        }
+
+        h1 {
+            text-align: left;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+            margin: 0;
+        }
+
+        p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+
+        .controls {
+            margin-top: 10px;
+            pointer-events: auto;
+        }
+
+        button {
+            width: auto;
+            padding: 8px 16px;
+            background: rgba(14, 165, 233, 0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(14, 165, 233, 0.4);
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: rgba(14, 165, 233, 0.4);
+        }
+
+        /* Tooltip-like label for planets */
+        .planet-label {
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            pointer-events: none;
+            text-shadow: 0 0 2px black;
+            transform: translate(-50%, -100%);
+            margin-top: -10px;
+            white-space: nowrap;
+            opacity: 0.8;
+            font-family: sans-serif;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui-layer">
+        <h1>Solar System Explorer</h1>
+        <p>A 2D journey through our neighborhood</p>
+        <div class="controls">
+            <button id="toggle-labels">Toggle Labels</button>
+            <button id="toggle-trails">Toggle Trails</button>
+            <button id="pause-resume">Pause</button>
+            <button id="reset-view">Reset View</button>
+        </div>
+    </div>
+
+    <canvas id="solar-canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('solar-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width;
+        let height;
+        let centerX;
+        let centerY;
+        let scale = 1;
+        let showLabels = true;
+        let showTrails = true;
+        let isPaused = false;
+
+        // Configuration
+        const BASE_SUN_RADIUS = 35;
+
+        // Planet Data (dist: base distance, r: base radius)
+        const planets = [
+            { name: "Mercury", r: 4, dist: 60, speed: 0.04, color: "#A0A0A0", angle: Math.random() * Math.PI * 2, gradient: ["#e0e0e0", "#5c5c5c"], desc: "The smallest planet" },
+            { name: "Venus", r: 7, dist: 90, speed: 0.015, color: "#E3BB76", angle: Math.random() * Math.PI * 2, gradient: ["#ffdfa8", "#d4a017"], desc: "The hottest planet" },
+            { name: "Earth", r: 7.5, dist: 130, speed: 0.01, color: "#22A6B3", angle: Math.random() * Math.PI * 2, gradient: ["#4dabf7", "#1098ad"], hasMoon: true, desc: "Our home" },
+            { name: "Mars", r: 5, dist: 170, speed: 0.008, color: "#EB4D4B", angle: Math.random() * Math.PI * 2, gradient: ["#ff8787", "#e03131"], desc: "The Red Planet" },
+            { name: "Jupiter", r: 18, dist: 240, speed: 0.004, color: "#F9CA24", angle: Math.random() * Math.PI * 2, gradient: ["#fff3bf", "#f08c00"], bands: true, desc: "The Gas Giant" },
+            { name: "Saturn", r: 15, dist: 310, speed: 0.003, color: "#F0932B", angle: Math.random() * Math.PI * 2, gradient: ["#ffe066", "#d9480f"], rings: true, desc: "The Ringed Planet" },
+            { name: "Uranus", r: 10, dist: 370, speed: 0.002, color: "#7ED6DF", angle: Math.random() * Math.PI * 2, gradient: ["#c5f6fa", "#22b8cf"], desc: " The Ice Giant" },
+            { name: "Neptune", r: 9.5, dist: 420, speed: 0.001, color: "#4834D4", angle: Math.random() * Math.PI * 2, gradient: ["#748ffc", "#364fc7"], desc: "The Blue Planet" }
+        ];
+
+        // Trails history
+        planets.forEach(p => p.history = []);
+
+        // Stars
+        const stars = [];
+        const numStars = 400;
+
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+
+            // Create stars
+            for (let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random(), // Store as normalized ratio
+                    y: Math.random(),
+                    size: Math.random() * 2,
+                    opacity: Math.random(),
+                    speed: Math.random() * 0.05
+                });
+            }
+
+            // Buttons
+            document.getElementById('toggle-labels').addEventListener('click', () => showLabels = !showLabels);
+            document.getElementById('toggle-trails').addEventListener('click', () => {
+                showTrails = !showTrails;
+                planets.forEach(p => p.history = []);
+            });
+            const pauseBtn = document.getElementById('pause-resume');
+            pauseBtn.addEventListener('click', () => {
+                isPaused = !isPaused;
+                pauseBtn.innerText = isPaused ? "Resume" : "Pause";
+            });
+
+            document.getElementById('reset-view').addEventListener('click', () => {
+                resize();
+            });
+
+            animate();
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2;
+
+            const minDim = Math.min(width, height);
+            // Neptune is at 420. Add buffer.
+            scale = (minDim / 2) / 480;
+        }
+
+        function drawStars() {
+            ctx.fillStyle = "white";
+            stars.forEach(star => {
+                ctx.globalAlpha = star.opacity;
+                ctx.beginPath();
+                // Draw star at scaled position to keep density consistent or just allow them to be fixed relative to screen?
+                // Fixed relative to screen is better for "background" feeling during resize, but normalized is easier
+                ctx.arc(star.x * width, star.y * height, star.size, 0, Math.PI * 2);
+                ctx.fill();
+                star.opacity += (Math.random() - 0.5) * 0.1;
+                if (star.opacity < 0.1) star.opacity = 0.1;
+                if (star.opacity > 1) star.opacity = 1;
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawSun() {
+            const r = BASE_SUN_RADIUS * scale;
+
+            // Glow
+            const gradient = ctx.createRadialGradient(centerX, centerY, r * 0.2, centerX, centerY, r * 3);
+            gradient.addColorStop(0, "rgba(255, 255, 200, 1)");
+            gradient.addColorStop(0.1, "rgba(255, 200, 50, 0.9)");
+            gradient.addColorStop(0.4, "rgba(255, 100, 0, 0.4)");
+            gradient.addColorStop(1, "rgba(255, 100, 0, 0)");
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r * 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.shadowBlur = 40 * scale;
+            ctx.shadowColor = "orange";
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawOrbit(planet) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, planet.dist * scale, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function drawPlanet(planet) {
+            const currentDist = planet.dist * scale;
+            const currentR = planet.r * Math.max(scale, 0.6); // Don't let them get too tiny
+
+            const x = centerX + Math.cos(planet.angle) * currentDist;
+            const y = centerY + Math.sin(planet.angle) * currentDist;
+
+            // Draw Trail
+            if (showTrails) {
+                planet.history.push({ x, y });
+                if (planet.history.length > 50) planet.history.shift();
+
+                ctx.beginPath();
+                ctx.strokeStyle = planet.color; // Base color for trail
+                ctx.lineWidth = 2 * scale;
+                for (let i = 0; i < planet.history.length - 1; i++) {
+                    const p1 = planet.history[i];
+                    const p2 = planet.history[i + 1];
+                    ctx.globalAlpha = i / planet.history.length * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Draw Planet Body
+            ctx.save();
+            ctx.translate(x, y);
+
+            const grad = ctx.createRadialGradient(-currentR / 2, -currentR / 2, 0, 0, 0, currentR);
+            grad.addColorStop(0, planet.gradient[0]);
+            grad.addColorStop(1, planet.gradient[1]);
+
+            ctx.fillStyle = grad;
+
+            // Rings for Saturn
+            if (planet.rings) {
+                ctx.save();
+                ctx.rotate(Math.PI / 6);
+
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(200, 180, 150, 0.6)";
+                ctx.lineWidth = 4 * scale;
+                ctx.ellipse(0, 0, currentR * 2.2, currentR * 0.8, 0, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(200, 180, 150, 0.3)";
+                ctx.lineWidth = 8 * scale;
+                ctx.ellipse(0, 0, currentR * 1.8, currentR * 0.6, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.beginPath();
+            ctx.arc(0, 0, currentR, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bands for Jupiter
+            if (planet.bands) {
+                ctx.globalCompositeOperation = 'source-atop'; // Draw only on planet
+                ctx.fillStyle = "rgba(0,0,0,0.1)";
+                ctx.fillRect(-currentR, -currentR * 0.4, currentR * 2, currentR * 0.2);
+                ctx.fillRect(-currentR, currentR * 0.2, currentR * 2, currentR * 0.2);
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            ctx.restore();
+
+            // Draw Label
+            if (showLabels) {
+                ctx.font = `${Math.max(10, 12 * scale)}px system-ui`;
+                ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                ctx.textAlign = "center";
+                ctx.fillText(planet.name, x, y - currentR - 8);
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            drawStars();
+
+            // Draw orbits first so they are behind everything
+            planets.forEach(p => drawOrbit(p));
+
+            drawSun();
+
+            planets.forEach(p => {
+                if (!isPaused) {
+                    p.angle += p.speed;
+                }
+                drawPlanet(p);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
