@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="common.css">
     <style>
         canvas {
-            max-width: 300px;
-            max-height: 300px;
+            width: 100%;
+            height: auto;
         }
     </style>
 </head>
@@ -70,7 +70,7 @@
             </div>
 
             <div class="chart-container">
-                <canvas id="pie-chart" width="300" height="300"></canvas>
+                <canvas id="growth-chart" width="520" height="280"></canvas>
             </div>
         </div>
     </div>
@@ -143,56 +143,157 @@
             document.getElementById('est-returns').textContent = formatCurrency(estimatedReturns, currency);
             document.getElementById('total-value').textContent = formatCurrency(futureValue, currency);
 
-            // Draw pie chart
-            drawPieChart(investedAmount, estimatedReturns);
+            // Draw growth chart
+            drawGrowthChart(monthlyInvestment, monthlyRate, months);
         }
 
-        function drawPieChart(invested, returns) {
-            const canvas = document.getElementById('pie-chart');
+        function drawGrowthChart(monthlyInvestment, monthlyRate, totalMonths) {
+            const canvas = document.getElementById('growth-chart');
             const ctx = canvas.getContext('2d');
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = 120;
 
-            const total = invested + returns;
-            const investedAngle = (invested / total) * 2 * Math.PI;
-            const returnsAngle = (returns / total) * 2 * Math.PI;
+            // Chart dimensions
+            const padding = { left: 50, right: 20, top: 20, bottom: 40 };
+            const chartWidth = canvas.width - padding.left - padding.right;
+            const chartHeight = canvas.height - padding.top - padding.bottom;
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw invested amount slice
+            // Calculate data points for each month
+            const dataPoints = [];
+            for (let month = 0; month <= totalMonths; month++) {
+                const invested = monthlyInvestment * month;
+                let totalValue = 0;
+
+                if (month > 0) {
+                    totalValue = monthlyInvestment *
+                        (Math.pow(1 + monthlyRate, month) - 1) / monthlyRate *
+                        (1 + monthlyRate);
+                }
+
+                dataPoints.push({ month, invested, totalValue });
+            }
+
+            // Find max value for scaling
+            const maxValue = Math.max(...dataPoints.map(d => d.totalValue));
+
+            // Helper function to convert data to canvas coordinates
+            function toX(month) {
+                return padding.left + (month / totalMonths) * chartWidth;
+            }
+
+            function toY(value) {
+                return padding.top + chartHeight - (value / maxValue) * chartHeight;
+            }
+
+            // Draw grid lines
+            ctx.strokeStyle = 'rgb(229, 231, 235)';
+            ctx.lineWidth = 1;
+            const gridLines = 4;
+            for (let i = 0; i <= gridLines; i++) {
+                const y = padding.top + (chartHeight / gridLines) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartWidth, y);
+                ctx.stroke();
+            }
+
+            // Draw invested amount area
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.1)';
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, 0, investedAngle);
+            ctx.moveTo(padding.left, toY(0));
+            dataPoints.forEach(d => {
+                ctx.lineTo(toX(d.month), toY(d.invested));
+            });
+            ctx.lineTo(padding.left + chartWidth, toY(0));
             ctx.closePath();
-            ctx.fillStyle = 'rgb(14, 165, 233)';
             ctx.fill();
 
-            // Draw returns slice
+            // Draw invested amount line
+            ctx.strokeStyle = 'rgb(14, 165, 233)';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, investedAngle, investedAngle + returnsAngle);
+            dataPoints.forEach((d, i) => {
+                if (i === 0) {
+                    ctx.moveTo(toX(d.month), toY(d.invested));
+                } else {
+                    ctx.lineTo(toX(d.month), toY(d.invested));
+                }
+            });
+            ctx.stroke();
+
+            // Draw total value area
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+            ctx.beginPath();
+            ctx.moveTo(padding.left, toY(0));
+            dataPoints.forEach(d => {
+                ctx.lineTo(toX(d.month), toY(d.totalValue));
+            });
+            ctx.lineTo(padding.left + chartWidth, toY(0));
             ctx.closePath();
-            ctx.fillStyle = 'rgb(34, 197, 94)';
             ctx.fill();
 
-            // Add labels
-            ctx.fillStyle = 'rgb(17, 24, 39)';
-            ctx.font = 'bold 14px system-ui';
+            // Draw total value line
+            ctx.strokeStyle = 'rgb(34, 197, 94)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dataPoints.forEach((d, i) => {
+                if (i === 0) {
+                    ctx.moveTo(toX(d.month), toY(d.totalValue));
+                } else {
+                    ctx.lineTo(toX(d.month), toY(d.totalValue));
+                }
+            });
+            ctx.stroke();
+
+            // Draw axes
+            ctx.strokeStyle = 'rgb(107, 114, 128)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+            ctx.stroke();
+
+            // Draw Y-axis labels
+            ctx.fillStyle = 'rgb(107, 114, 128)';
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= gridLines; i++) {
+                const value = maxValue * (1 - i / gridLines);
+                const y = padding.top + (chartHeight / gridLines) * i;
+                const label = value >= 1000000 ? (value / 1000000).toFixed(1) + 'M' :
+                             value >= 1000 ? (value / 1000).toFixed(0) + 'K' :
+                             value.toFixed(0);
+                ctx.fillText(label, padding.left - 5, y);
+            }
+
+            // Draw X-axis labels (years)
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const years = totalMonths / 12;
+            const yearSteps = years <= 10 ? 1 : years <= 20 ? 2 : 5;
+            for (let year = 0; year <= years; year += yearSteps) {
+                const x = toX(year * 12);
+                ctx.fillText(year + 'y', x, padding.top + chartHeight + 5);
+            }
 
-            // Invested label
-            const investedLabelAngle = investedAngle / 2;
-            const investedLabelX = centerX + Math.cos(investedLabelAngle) * (radius / 1.5);
-            const investedLabelY = centerY + Math.sin(investedLabelAngle) * (radius / 1.5);
-            ctx.fillText('Invested', investedLabelX, investedLabelY);
+            // Draw legend
+            ctx.textAlign = 'left';
+            ctx.font = '12px system-ui';
 
-            // Returns label
-            const returnsLabelAngle = investedAngle + returnsAngle / 2;
-            const returnsLabelX = centerX + Math.cos(returnsLabelAngle) * (radius / 1.5);
-            const returnsLabelY = centerY + Math.sin(returnsLabelAngle) * (radius / 1.5);
-            ctx.fillText('Returns', returnsLabelX, returnsLabelY);
+            // Invested legend
+            ctx.fillStyle = 'rgb(14, 165, 233)';
+            ctx.fillRect(padding.left + chartWidth - 110, padding.top + 5, 15, 3);
+            ctx.fillStyle = 'rgb(75, 85, 99)';
+            ctx.fillText('Invested', padding.left + chartWidth - 90, padding.top + 5);
+
+            // Total value legend
+            ctx.fillStyle = 'rgb(34, 197, 94)';
+            ctx.fillRect(padding.left + chartWidth - 110, padding.top + 20, 15, 3);
+            ctx.fillStyle = 'rgb(75, 85, 99)';
+            ctx.fillText('Total', padding.left + chartWidth - 90, padding.top + 20);
         }
 
         // Event listeners for sliders
